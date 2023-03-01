@@ -15,6 +15,8 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "c8": "^7.13.0",
-    "mocha": "^10.2.0"
+    "mocha": "^10.2.0",
+    "msw": "^1.1.0",
+    "node-fetch": "^3.3.0"
   }
 }

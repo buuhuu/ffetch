@@ -18,7 +18,6 @@ async function* request({
   let appliedOffset = offset;
   while (yielded < limit) {
     const resp = await fetch(`${url}?offset=${appliedOffset}&limit=${chunks}`);
-
     if (resp.ok) {
       const { total, data } = await resp.json();
       for (let entry of data) {
@@ -31,11 +30,8 @@ async function* request({
             if (map) {
               entry = await map(entry);
             }
-
             yield entry;
-
             yielded += 1;
-
             if (yielded === limit) {
               // done early
               return;
@@ -43,7 +39,6 @@ async function* request({
           }
         }
       }
-
       if (data.length === chunks && offset + chunks < total) {
         // request more
         appliedOffset += chunks;
@@ -67,7 +62,6 @@ function createGenerator(context) {
     map: (map) => createGenerator({ ...context, map }),
     filter: (filter) => createGenerator({ ...context, filter }),
     slice: (from, to) => createGenerator({ ...context, skip: from, limit: to - from }),
-
     all: async () => {
       const result = [];
       for await (const entry of request(context)) {

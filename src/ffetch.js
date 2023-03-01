@@ -10,23 +10,35 @@
  * governing permissions and limitations under the License.
  */
 
-async function* request({ url, offset, chunks, limit, filter, map, fetch }) {
-    while (offset < limit) {
-        if (offset + chunks > limit) {
-            // request only as many items as fit into the requested limit
-            chunks = limit - offset;
-        }
-
+async function* request({ url, offset, chunks, skip, limit, filter, map, fetch }) {
+    let yielded = 0;
+    let skipped = 0;
+    while (yielded < limit) {
         const resp = await fetch(`${url}?offset=${offset}&limit=${chunks}`);
 
         if (resp.ok) {
             const { total, data } = await resp.json();
             for (let entry of data) {
                 if (!filter || filter(entry)) {
+                    // we have to skip manually as slice(from, to) should apply after 
+                    // any filter
+                    if (skipped < skip) {
+                        skipped ++;
+                        continue;
+                    }
+
                     if (map) {
                         entry = await map(entry);
                     }
+
                     yield entry;
+                    
+                    yielded += 1;
+
+                    if (yielded === limit) {
+                        // done early
+                        return;
+                    }
                 }
             }
 
@@ -52,7 +64,7 @@ function createGenerator(context) {
         limit: (limit) => createGenerator({ ...context, limit }),
         map: (map) => createGenerator({ ...context, map }),
         filter: (filter) => createGenerator({ ...context, filter }),
-        slice: (from, to) => createGenerator({ ...context, offset: from, limit: to }),
+        slice: (from, to) => createGenerator({ ...context, skip: from, limit: to - from }),
 
         all: async () => {
             const result = [];
@@ -68,5 +80,5 @@ function createGenerator(context) {
 }
 
 export default function ffetch(url, fetch = window.fetch) {
-    return createGenerator({ fetch, url, offset: 0, chunks: 255, limit: Infinity });
+    return createGenerator({ fetch, url, offset: 0, skip: 0, chunks: 255, limit: Infinity });
 }

@@ -57,6 +57,20 @@ describe('ffetch', () => {
         assert.equal(5, i)
     });
 
+    it('returns a generator that filters a sliced set of entries', async () => {
+        const expectedEntries = ['Entry 99', 'Entry 199', 'Entry 299', 'Entry 399', 'Entry 499'];
+        const entries = ffetch('https://test.data/555-simple-entries.json', fetch)
+            .filter(({ title }) => expectedEntries.indexOf(title) >= 0)
+            .slice(2,4);
+        let i = 0;
+        for await (const entry of entries) {
+            assert.equal(entry.title, expectedEntries[i + 2]);
+            i++;
+        }
+        assert.equal(2, i)
+    });
+    
+
     it('returns an array of all entries', async () => {
         const entries = await ffetch('https://test.data/555-simple-entries.json', fetch)
             .limit(5)

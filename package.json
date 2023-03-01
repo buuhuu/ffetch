@@ -5,7 +5,8 @@
   "main": "src/index.js",
   "type": "module",
   "scripts": {
-    "test": "c8 mocha"
+    "test": "c8 mocha",
+    "lint": "eslint src/**/*.js test/**/*.js"
   },
   "keywords": [
     "fetch",
@@ -15,6 +16,9 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "c8": "^7.13.0",
+    "eslint": "^8.35.0",
+    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-plugin-import": "^2.27.5",
     "mocha": "^10.2.0",
     "msw": "^1.1.0",
     "node-fetch": "^3.3.0"

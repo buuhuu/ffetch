@@ -22,19 +22,21 @@ async function* request({
       const { total, data } = await resp.json();
       for (let entry of data) {
         if (!filter || filter(entry)) {
-          // we have to skip manually as slice(from, to) should apply after
-          // any filter
-          if (skipped < skip) {
-            skipped += 1;
-          } else {
-            if (map) {
-              entry = await map(entry);
-            }
-            yield entry;
-            yielded += 1;
-            if (yielded === limit) {
-              // done early
-              return;
+          if (map) {
+            entry = await map(entry);
+          }
+          if (entry) {
+            // we have to skip manually as slice(from, to) should apply after
+            // any filter
+            if (skipped < skip) {
+              skipped += 1;
+            } else {
+              yield entry;
+              yielded += 1;
+              if (yielded === limit) {
+                // done early
+                return;
+              }
             }
           }
         }
@@ -52,6 +54,8 @@ async function* request({
     }
   }
 }
+
+// Operations
 
 function limit(context, limit) {
   return createGenerator({ ...context, limit });
@@ -79,6 +83,20 @@ function slice(context, from, to) {
   return createGenerator({ ...context, skip: from, limit: to - from });
 }
 
+function follow(context, name) {
+  return map(context, async (entry) => {
+    const value = entry[name];
+    if (value) {
+      const resp = await context.fetch(value);
+      if (resp.ok) {
+        const html = await resp.text();
+        return context.parseHtml(html);
+      }
+    }
+    return null;
+  });
+}
+
 async function all(context) {
   const result = [];
   for await (const entry of request(context)) {
@@ -95,18 +113,24 @@ async function first(context) {
   return null;
 }
 
+// helper
+
 function createGenerator(context) {
   // create the generator
   const generator = request(context);
   // create the map of supported operations
-  const operations = [limit, map, filter, slice, all, first]
+  const operations = [limit, map, filter, slice, follow, all, first]
     .reduce((ops, fn) => ({ ...ops, [fn.name]: fn.bind(null, context) }), {});
   // assign the operations to the generator
   return Object.assign(generator, operations);
 }
 
-export default function ffetch(url, fetch = window.fetch) {
+export default function ffetch(
+  url, 
+  fetch = window.fetch, 
+  parseHtml = (html) => new DOMParser().parseFromString(html, 'text/html')
+) {
   return createGenerator({
-    fetch, url, offset: 0, skip: 0, chunks: 255, limit: Infinity,
+    fetch, parseHtml, url, offset: 0, skip: 0, chunks: 255, limit: Infinity,
   });
 }

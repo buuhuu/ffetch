@@ -74,11 +74,9 @@ function follow(upstream, name, context) {
     const value = entry[name];
     if (value) {
       const resp = await fetch(value);
-      if (resp.ok) {
-        return { ...entry, [name]: parseHtml(await resp.text()) };
-      }
+      return { ...entry, [name]: resp.ok ? parseHtml(await resp.text()) : null };
     }
-    return null;
+    return entry;
   });
 }
 

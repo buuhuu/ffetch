@@ -222,16 +222,18 @@ describe('ffetch', () => {
           .first();
 
         assert(entry);
+        assert(entry.path);
       });
 
       it('returns null if the reference does not exist', async () => {
-        mockIndexRequests('/query-index.json', 1, 255, () => ({ path: '/document' }));
+        mockIndexRequests('/query-index.json', 1, 255, () => ({ ref: '/document' }));
 
         const entry = await ffetch('/query-index.json', fetch, parseDocument)
-          .follow('reference')
+          .follow('path')
           .first();
 
-        assert(!entry);
+        assert(entry);
+        assert(!entry.path);
       });
 
       it('returns null if the referenced document is not found', async () => {
@@ -239,10 +241,11 @@ describe('ffetch', () => {
         mockIndexRequests('/query-index.json', 1, 255, () => ({ path: '/document' }));
 
         const entry = await ffetch('/query-index.json', fetch, parseDocument)
-          .follow('reference')
+          .follow('path')
           .first();
 
-        assert(!entry);
+        assert(entry);
+        assert(!entry.path);
       });
     });
   });

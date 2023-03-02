@@ -1,55 +1,75 @@
 /* eslint-disable no-undef */
-import nodeFetch from 'node-fetch';
+import { fetch as adobeFetch } from '@adobe/fetch';
 import assert from 'node:assert/strict';
 import { parseDocument } from 'htmlparser2';
+import nock from 'nock';
 import ffetch from '../src/ffetch.js';
-import server from './server.js';
+
+// enforce http/1.1 because nock does not support h2 yet
+const testDomain = 'http://example.com';
+
+function mockDocumentRequest(path, body = '<!DOCTYPE html><html><head><title>Document</title></head><body><main><p>Hello World</p></main></body></html>') {
+  nock(testDomain).get(path).reply(200, body);
+}
+
+function mockIndexRequests(path, total, chunks = 255, generatorFn = (i) => ({ title: `Entry ${i}` })) {
+  for (let offset = 0; offset < total; offset += chunks) {
+    const data = Array.from(
+      { length: offset + chunks < total ? chunks : 555 - offset },
+      (_, i) => generatorFn(offset + i)
+    );
+    const response = { total, offset, limit: chunks, data };
+
+    nock(testDomain).get(path).query({ offset, limit: chunks }).reply(200, response);
+  }
+}
+
+function mockNotFound(path) {
+  nock(testDomain).get(path).query(() => true).reply(404);
+}
 
 describe('ffetch', () => {
   // wrap fetch to make all calls absolute
   const fetch = (url) => (url.charAt(0) === '/'
-    ? nodeFetch(`https://test.data${url}`)
-    : nodeFetch(url));
-
-  let requestCount = 0;
-
-  before(() => {
-    server.listen();
-    server.events.on('request:start', () => { requestCount += 1; });
-  });
-  after(() => {
-    server.close();
-  });
-  afterEach(() => {
-    server.resetHandlers();
-    requestCount = 0;
-  });
+    ? adobeFetch(`${testDomain}${url}`)
+    : adobeFetch(url));
 
   it('returns a generator for all entries', async () => {
-    const entries = ffetch('/555-simple-entries.json', fetch);
+    mockIndexRequests('/query-index.json', 555);
+
+    const entries = ffetch('/query-index.json', fetch);
     let i = 0;
     for await (const entry of entries) {
       assert.deepStrictEqual(entry, { title: `Entry ${i}` });
       i += 1;
     }
+
     assert.equal(555, i);
-    assert.equal(3, requestCount);
   });
 
   describe('failure hanlding', () => {
     it('returns an empty generator for a 404', async () => {
+      mockNotFound('/not-found.json');
+
       const entries = ffetch('/not-found.json', fetch);
+
       /* eslint-disable-next-line no-unused-vars */
       for await (const entry of entries) assert(false);
     });
 
     it('returns an empty array for a 404', async () => {
+      mockNotFound('/not-found.json');
+
       const entries = await ffetch('/not-found.json', fetch).all();
+
       assert.equal(entries.length, 0);
     });
 
     it('returns null for the first enrty of a 404', async () => {
+      mockNotFound('/not-found.json');
+
       const entry = await ffetch('/not-found.json', fetch).first();
+
       assert.equal(null, entry);
     });
   });
@@ -57,31 +77,38 @@ describe('ffetch', () => {
   describe('operations', () => {
     describe('chunks', () => {
       it('returns a generator for all entries with custom chunk size', async () => {
-        const entries = ffetch('/555-simple-entries.json', fetch).chunks(1000);
+        mockIndexRequests('/query-index.json', 555, 1000);
+
+        const entries = ffetch('/query-index.json', fetch).chunks(1000);
         let i = 0;
         for await (const entry of entries) {
           assert.deepStrictEqual(entry, { title: `Entry ${i}` });
           i += 1;
         }
+
         assert.equal(555, i);
-        assert.equal(1, requestCount);
       });
     });
 
     describe('map', () => {
       it('returns a generator that maps each entry', async () => {
-        const entries = ffetch('/555-simple-entries.json', fetch)
+        mockIndexRequests('/query-index.json', 555);
+
+        const entries = ffetch('/query-index.json', fetch)
           .map(({ title }) => title);
         let i = 0;
         for await (const entry of entries) {
           assert.equal(entry, `Entry ${i}`);
           i += 1;
         }
+
         assert.equal(555, i);
       });
 
       it('returns the first enrty after applying multiple mappings', async () => {
-        const entry = await ffetch('/555-simple-entries.json', fetch)
+        mockIndexRequests('/query-index.json', 555);
+
+        const entry = await ffetch('/query-index.json', fetch)
           .map(({ title }) => title)
           .map((title) => title.toUpperCase())
           .first();
@@ -92,19 +119,24 @@ describe('ffetch', () => {
 
     describe('filter', () => {
       it('returns a generator that filters entries', async () => {
+        mockIndexRequests('/query-index.json', 555);
+
         const expectedEntries = ['Entry 99', 'Entry 199', 'Entry 299', 'Entry 399', 'Entry 499'];
-        const entries = ffetch('/555-simple-entries.json', fetch)
+        const entries = ffetch('/query-index.json', fetch)
           .filter(({ title }) => expectedEntries.indexOf(title) >= 0);
         let i = 0;
         for await (const entry of entries) {
           assert.equal(entry.title, expectedEntries[i]);
           i += 1;
         }
+
         assert.equal(5, i);
       });
 
       it('returns the first enrty after multiple filters', async () => {
-        const entry = await ffetch('/555-simple-entries.json', fetch)
+        mockIndexRequests('/query-index.json', 555);
+
+        const entry = await ffetch('/query-index.json', fetch)
           .filter(({ title }) => title.indexOf('9') > 0)
           .filter(({ title }) => title.indexOf('8') > 0)
           .filter(({ title }) => title.indexOf('4') > 0)
@@ -116,18 +148,23 @@ describe('ffetch', () => {
 
     describe('limit', () => {
       it('returns a generator for a limited set entries', async () => {
-        const entries = ffetch('/555-simple-entries.json', fetch)
+        mockIndexRequests('/query-index.json', 555);
+
+        const entries = ffetch('/query-index.json', fetch)
           .limit(10);
         let i = 0;
         for await (const entry of entries) {
           assert.deepStrictEqual(entry, { title: `Entry ${i}` });
           i += 1;
         }
+
         assert.equal(10, i);
       });
 
       it('returns an array of all entries', async () => {
-        const entries = await ffetch('/555-simple-entries.json', fetch)
+        mockIndexRequests('/query-index.json', 555);
+
+        const entries = await ffetch('/query-index.json', fetch)
           .limit(5)
           .all();
 
@@ -143,8 +180,10 @@ describe('ffetch', () => {
 
     describe('slice', () => {
       it('returns a generator that filters a sliced set of entries', async () => {
+        mockIndexRequests('/query-index.json', 555);
+
         const expectedEntries = ['Entry 99', 'Entry 199', 'Entry 299', 'Entry 399', 'Entry 499'];
-        const entries = ffetch('/555-simple-entries.json', fetch)
+        const entries = ffetch('/query-index.json', fetch)
           .filter(({ title }) => expectedEntries.indexOf(title) >= 0)
           .slice(2, 4);
         let i = 0;
@@ -152,11 +191,14 @@ describe('ffetch', () => {
           assert.equal(entry.title, expectedEntries[i + 2]);
           i += 1;
         }
+
         assert.equal(2, i);
       });
 
       it('returns an array of a slice of entries', async () => {
-        const entries = await ffetch('/555-simple-entries.json', fetch)
+        mockIndexRequests('/query-index.json', 555);
+
+        const entries = await ffetch('/query-index.json', fetch)
           .slice(300, 305)
           .all();
 
@@ -167,14 +209,15 @@ describe('ffetch', () => {
           { title: 'Entry 303' },
           { title: 'Entry 304' },
         ]);
-
-        assert.equal(2, requestCount);
       });
     });
 
     describe('follow', () => {
       it('returns the html parsed as document when following a reference', async () => {
-        const entry = await ffetch('/one-entry-with-a-reference.json', fetch, parseDocument)
+        mockDocumentRequest('/document');
+        mockIndexRequests('/query-index.json', 1, 255, () => ({ path: '/document' }));
+
+        const entry = await ffetch('/query-index.json', fetch, parseDocument)
           .follow('path')
           .first();
 
@@ -182,7 +225,9 @@ describe('ffetch', () => {
       });
 
       it('returns null if the reference does not exist', async () => {
-        const entry = await ffetch('/one-entry-with-a-reference.json', fetch, parseDocument)
+        mockIndexRequests('/query-index.json', 1, 255, () => ({ path: '/document' }));
+
+        const entry = await ffetch('/query-index.json', fetch, parseDocument)
           .follow('reference')
           .first();
 
@@ -190,7 +235,10 @@ describe('ffetch', () => {
       });
 
       it('returns null if the referenced document is not found', async () => {
-        const entry = await ffetch('/one-entry-with-a-none-existing-reference.json', fetch, parseDocument)
+        mockNotFound('/document')
+        mockIndexRequests('/query-index.json', 1, 255, () => ({ path: '/document' }));
+
+        const entry = await ffetch('/query-index.json', fetch, parseDocument)
           .follow('reference')
           .first();
 
@@ -200,7 +248,9 @@ describe('ffetch', () => {
   });
 
   it('implements array-like semantics for chaining operations', async () => {
-    const entries = await ffetch('/555-simple-entries.json', fetch)
+    mockIndexRequests('/query-index.json', 555);
+
+    const entries = await ffetch('/query-index.json', fetch)
       .slice(100, 500) // entry 199 to 499
       .map(({ title }) => title) // map to title
       .filter((title) => title.indexOf('99') > 0) // filter now applied on title

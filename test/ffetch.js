@@ -20,7 +20,7 @@ describe('ffetch', () => {
     assert.equal(entries.length, 0);
   });
 
-  it('returns null for a the first enrty of a 404', async () => {
+  it('returns null for the first enrty of a 404', async () => {
     const entry = await ffetch('https://test.data/not-found.json', fetch).first();
     assert.equal(null, entry);
   });

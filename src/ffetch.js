@@ -120,13 +120,17 @@ async function first(context) {
 // helper
 
 function createGenerator(context) {
-  // create the generator
-  const generator = request(context);
-  // create the map of supported operations
-  const operations = [ chunks, limit, map, filter, slice, follow, all, first ]
-    .reduce((ops, fn) => ({ ...ops, [fn.name]: fn.bind(null, context) }), {});
-  // assign the operations to the generator
-  return Object.assign(generator, operations);
+  // create the generator and assign additional operations 
+  return Object.assign(request(context), {
+    chunks: chunks.bind(null, context),
+    limit: limit.bind(null, context),
+    map: map.bind(null, context),
+    filter: filter.bind(null, context),
+    slice: slice.bind(null, context),
+    follow: follow.bind(null, context),
+    all: all.bind(null, context),
+    first: first.bind(null, context),
+  });
 }
 
 export default function ffetch(

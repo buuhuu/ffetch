@@ -15,10 +15,10 @@
   "author": "Dirk Rudolph",
   "license": "Apache-2.0",
   "devDependencies": {
+    "@adobe/eslint-config-helix": "^2.0.2",
     "@adobe/fetch": "^4.0.4",
     "c8": "^7.13.0",
     "eslint": "^8.35.0",
-    "eslint-config-airbnb-base": "^15.0.0",
     "eslint-plugin-import": "^2.27.5",
     "htmlparser2": "^8.0.1",
     "mocha": "^10.2.0",

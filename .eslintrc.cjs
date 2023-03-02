@@ -3,7 +3,7 @@ module.exports = {
     browser: true,
     es2021: true,
   },
-  extends: 'airbnb-base',
+  extends: '@adobe/helix',
   overrides: [
   ],
   parserOptions: {
@@ -12,9 +12,6 @@ module.exports = {
   },
   rules: {
     'no-await-in-loop': 'off',
-    'no-restricted-syntax': 'off',
-    'import/extensions': 'off',
-    'no-use-before-define': 'off',
     'no-shadow': 'off'
   },
 };

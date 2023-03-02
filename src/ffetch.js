@@ -57,6 +57,10 @@ async function* request({
 
 // Operations
 
+function chunks(context, chunks) {
+  return createGenerator({ ...context, chunks });
+}
+
 function limit(context, limit) {
   return createGenerator({ ...context, limit });
 }
@@ -119,7 +123,7 @@ function createGenerator(context) {
   // create the generator
   const generator = request(context);
   // create the map of supported operations
-  const operations = [limit, map, filter, slice, follow, all, first]
+  const operations = [ chunks, limit, map, filter, slice, follow, all, first ]
     .reduce((ops, fn) => ({ ...ops, [fn.name]: fn.bind(null, context) }), {});
   // assign the operations to the generator
   return Object.assign(generator, operations);
@@ -128,9 +132,18 @@ function createGenerator(context) {
 export default function ffetch(
   url, 
   fetch = window.fetch, 
-  parseHtml = (html) => new DOMParser().parseFromString(html, 'text/html')
+  parseHtml = (html) => new window.DOMParser().parseFromString(html, 'text/html')
 ) {
+  let chunks = 255;
+
+  try {
+    if ('connection' in window.navigator && window.navigator.connection.saveData === true) {
+      // request smaller chunks in save data mode
+      chunks = 64;
+    }
+  } catch (e) { /* ignore */ }
+
   return createGenerator({
-    fetch, parseHtml, url, offset: 0, skip: 0, chunks: 255, limit: Infinity,
+    fetch, parseHtml, url, offset: 0, skip: 0, chunks, limit: Infinity,
   });
 }

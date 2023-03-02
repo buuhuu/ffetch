@@ -6,14 +6,24 @@ import ffetch from '../src/ffetch.js';
 import server from './server.js';
 
 describe('ffetch', () => {
-  before(() => server.listen());
-  after(() => server.close());
-  afterEach(() => server.resetHandlers());
-
   // wrap fetch to make all calls absolute
-  const fetch = (url) => url.charAt(0) === '/' 
+  const fetch = (url) => url.charAt(0) === '/'
     ? nodeFetch(`https://test.data${url}`)
     : nodeFetch(url);
+
+  let requestCount = 0;
+
+  before(() => {
+    server.listen()
+    server.events.on('request:start', () => requestCount += 1);
+  });
+  after(() => {
+    server.close()
+  });
+  afterEach(() => {
+    server.resetHandlers()
+    requestCount = 0;
+  });
 
   it('returns a generator for all entries', async () => {
     const entries = ffetch('/555-simple-entries.json', fetch);
@@ -23,7 +33,23 @@ describe('ffetch', () => {
       i += 1;
     }
     assert.equal(555, i);
+    assert.equal(3, requestCount);
   });
+
+  describe('chunks', () => {
+
+    it('returns a generator for all entries with custom chunk size', async () => {
+      const entries = ffetch('/555-simple-entries.json', fetch).chunks(1000);
+      let i = 0;
+      for await (const entry of entries) {
+        assert.deepStrictEqual(entry, { title: `Entry ${i}` });
+        i += 1;
+      }
+      assert.equal(555, i);
+      assert.equal(1, requestCount);
+    });
+
+  })
 
   describe('failure hanlding', () => {
 
@@ -63,7 +89,7 @@ describe('ffetch', () => {
         .map(({ title }) => title)
         .map(title => title.toUpperCase())
         .first();
-  
+
       assert.equal(entry, 'ENTRY 0');
     });
 
@@ -89,7 +115,7 @@ describe('ffetch', () => {
         .filter(({ title }) => title.indexOf('8') > 0)
         .filter(({ title }) => title.indexOf('4') > 0)
         .first();
-  
+
       assert.deepStrictEqual(entry, { title: 'Entry 489' });
     });
 

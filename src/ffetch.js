@@ -53,24 +53,54 @@ async function* request({
   }
 }
 
+function limit(context, limit) {
+  return createGenerator({ ...context, limit });
+}
+
+function map(context, fn) {
+  return createGenerator({
+    ...context,
+    map: context.map
+      ? async (entry) => fn(await context.map(entry))
+      : fn,
+  });
+}
+
+function filter(context, fn) {
+  return createGenerator({
+    ...context,
+    filter: context.filter
+      ? (entry) => context.filter(entry) && fn(entry)
+      : fn,
+  });
+}
+
+function slice(context, from, to) {
+  return createGenerator({ ...context, skip: from, limit: to - from });
+}
+
+async function all(context) {
+  const result = [];
+  for await (const entry of request(context)) {
+    result.push(entry);
+  }
+  return result;
+}
+
+async function first(context) {
+  /* eslint-disable-next-line no-unreachable-loop */
+  for await (const entry of request(context)) {
+    return entry;
+  }
+  return null;
+}
+
 function createGenerator(context) {
   // create the generator
   const generator = request(context);
   // create the map of supported operations
-  const operations = {
-    limit: (limit) => createGenerator({ ...context, limit }),
-    map: (map) => createGenerator({ ...context, map }),
-    filter: (filter) => createGenerator({ ...context, filter }),
-    slice: (from, to) => createGenerator({ ...context, skip: from, limit: to - from }),
-    all: async () => {
-      const result = [];
-      for await (const entry of request(context)) {
-        result.push(entry);
-      }
-      return result;
-    },
-  };
-
+  const operations = [limit, map, filter, slice, all, first]
+    .reduce((ops, fn) => ({ ...ops, [fn.name]: fn.bind(null, context) }), {});
   // assign the operations to the generator
   return Object.assign(generator, operations);
 }

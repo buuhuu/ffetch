@@ -15,6 +15,16 @@ describe('ffetch', () => {
     for await (const entry of entries) assert(false);
   });
 
+  it('returns an empty array for a 404', async () => {
+    const entries = await ffetch('https://test.data/not-found.json', fetch).all();
+    assert.equal(entries.length, 0);
+  });
+
+  it('returns null for a the first enrty of a 404', async () => {
+    const entry = await ffetch('https://test.data/not-found.json', fetch).first();
+    assert.equal(null, entry);
+  });
+
   it('returns a generator for all entries', async () => {
     const entries = ffetch('https://test.data/555-simple-entries.json', fetch);
     let i = 0;
@@ -98,5 +108,17 @@ describe('ffetch', () => {
       { title: 'Entry 8' },
       { title: 'Entry 9' },
     ]);
+  });
+
+  it('returns the first enrty after multiple filters and mappings', async () => {
+    const entry = await ffetch('https://test.data/555-simple-entries.json', fetch)
+      .filter(({ title }) => title.indexOf('9') > 0)
+      .filter(({ title }) => title.indexOf('8') > 0)
+      .filter(({ title }) => title.indexOf('4') > 0)
+      .map(({ title }) => title)
+      .map((title) => title.toUpperCase())
+      .first();
+
+    assert.equal(entry, 'ENTRY 489');
   });
 });

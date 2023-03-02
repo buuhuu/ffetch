@@ -13,6 +13,8 @@ module.exports = {
   rules: {
     'no-await-in-loop': 'off',
     'no-restricted-syntax': 'off',
-    'import/extensions': 'off'
+    'import/extensions': 'off',
+    'no-use-before-define': 'off',
+    'no-shadow': 'off'
   },
 };

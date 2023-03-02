@@ -7,21 +7,21 @@ import server from './server.js';
 
 describe('ffetch', () => {
   // wrap fetch to make all calls absolute
-  const fetch = (url) => url.charAt(0) === '/'
+  const fetch = (url) => (url.charAt(0) === '/'
     ? nodeFetch(`https://test.data${url}`)
-    : nodeFetch(url);
+    : nodeFetch(url));
 
   let requestCount = 0;
 
   before(() => {
-    server.listen()
-    server.events.on('request:start', () => requestCount += 1);
+    server.listen();
+    server.events.on('request:start', () => { requestCount += 1; });
   });
   after(() => {
-    server.close()
+    server.close();
   });
   afterEach(() => {
-    server.resetHandlers()
+    server.resetHandlers();
     requestCount = 0;
   });
 
@@ -37,7 +37,6 @@ describe('ffetch', () => {
   });
 
   describe('failure hanlding', () => {
-
     it('returns an empty generator for a 404', async () => {
       const entries = ffetch('/not-found.json', fetch);
       /* eslint-disable-next-line no-unused-vars */
@@ -53,13 +52,10 @@ describe('ffetch', () => {
       const entry = await ffetch('/not-found.json', fetch).first();
       assert.equal(null, entry);
     });
-
-  })
+  });
 
   describe('operations', () => {
-
     describe('chunks', () => {
-
       it('returns a generator for all entries with custom chunk size', async () => {
         const entries = ffetch('/555-simple-entries.json', fetch).chunks(1000);
         let i = 0;
@@ -70,11 +66,9 @@ describe('ffetch', () => {
         assert.equal(555, i);
         assert.equal(1, requestCount);
       });
-
-    })
+    });
 
     describe('map', () => {
-
       it('returns a generator that maps each entry', async () => {
         const entries = ffetch('/555-simple-entries.json', fetch)
           .map(({ title }) => title);
@@ -89,16 +83,14 @@ describe('ffetch', () => {
       it('returns the first enrty after applying multiple mappings', async () => {
         const entry = await ffetch('/555-simple-entries.json', fetch)
           .map(({ title }) => title)
-          .map(title => title.toUpperCase())
+          .map((title) => title.toUpperCase())
           .first();
 
         assert.equal(entry, 'ENTRY 0');
       });
-
-    })
+    });
 
     describe('filter', () => {
-
       it('returns a generator that filters entries', async () => {
         const expectedEntries = ['Entry 99', 'Entry 199', 'Entry 299', 'Entry 399', 'Entry 499'];
         const entries = ffetch('/555-simple-entries.json', fetch)
@@ -120,11 +112,9 @@ describe('ffetch', () => {
 
         assert.deepStrictEqual(entry, { title: 'Entry 489' });
       });
-
-    })
+    });
 
     describe('limit', () => {
-
       it('returns a generator for a limited set entries', async () => {
         const entries = ffetch('/555-simple-entries.json', fetch)
           .limit(10);
@@ -149,11 +139,9 @@ describe('ffetch', () => {
           { title: 'Entry 4' },
         ]);
       });
-
-    })
+    });
 
     describe('slice', () => {
-
       it('returns a generator that filters a sliced set of entries', async () => {
         const expectedEntries = ['Entry 99', 'Entry 199', 'Entry 299', 'Entry 399', 'Entry 499'];
         const entries = ffetch('/555-simple-entries.json', fetch)
@@ -182,8 +170,7 @@ describe('ffetch', () => {
 
         assert.equal(2, requestCount);
       });
-
-    })
+    });
 
     describe('follow', () => {
       it('returns the html parsed as document when following a reference', async () => {
@@ -209,7 +196,19 @@ describe('ffetch', () => {
 
         assert(!entry);
       });
-    })
+    });
+  });
 
-  })
+  it('implements array-like semantics for chaining operations', async () => {
+    const entries = await ffetch('/555-simple-entries.json', fetch)
+      .slice(100, 500) // entry 199 to 499
+      .map(({ title }) => title) // map to title
+      .filter((title) => title.indexOf('99') > 0) // filter now applied on title
+      .map((title) => title.toUpperCase()) // map applied on title as well
+      .slice(1, 2) // slice of ENTRY 199, ENTRY 299, ENTRY 399
+      .all();
+
+    assert.equal(1, entries.length);
+    assert.equal('ENTRY 299', entries[0]);
+  });
 });

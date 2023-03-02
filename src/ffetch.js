@@ -10,46 +10,15 @@
  * governing permissions and limitations under the License.
  */
 
-async function* request({
-  url, offset, chunks, skip, limit, filter, map, fetch,
-}) {
-  let yielded = 0;
-  let skipped = 0;
-  let appliedOffset = offset;
-  while (yielded < limit) {
-    const resp = await fetch(`${url}?offset=${appliedOffset}&limit=${chunks}`);
+async function* request(url, context) {
+  const { chunks, fetch } = context;
+  for (let offset = 0, total = Infinity; offset < total; offset += chunks) {
+    const resp = await fetch(`${url}?offset=${offset}&limit=${chunks}`);
     if (resp.ok) {
-      const { total, data } = await resp.json();
-      for (let entry of data) {
-        if (!filter || filter(entry)) {
-          if (map) {
-            entry = await map(entry);
-          }
-          if (entry) {
-            // we have to skip manually as slice(from, to) should apply after
-            // any filter
-            if (skipped < skip) {
-              skipped += 1;
-            } else {
-              yield entry;
-              yielded += 1;
-              if (yielded === limit) {
-                // done early
-                return;
-              }
-            }
-          }
-        }
-      }
-      if (data.length === chunks && offset + chunks < total) {
-        // request more
-        appliedOffset += chunks;
-      } else {
-        // done
-        return;
-      }
+      const json = await resp.json();
+      total = json.total;
+      for (const entry of json.data) yield entry;
     } else {
-      // todo: do we need error handling?
       return;
     }
   }
@@ -57,61 +26,73 @@ async function* request({
 
 // Operations
 
-function chunks(context, chunks) {
-  return createGenerator({ ...context, chunks });
+function chunks(upstream, context, chunks) {
+  context.chunks = chunks;
+  return upstream;
 }
 
-function limit(context, limit) {
-  return createGenerator({ ...context, limit });
+async function* skip(upstream, skip) {
+  let skipped = 0;
+  for await (const entry of upstream) {
+    if (skipped < skip) {
+      skipped += 1;
+    } else {
+      yield entry;
+    }
+  }
 }
 
-function map(context, fn) {
-  return createGenerator({
-    ...context,
-    map: context.map
-      ? async (entry) => fn(await context.map(entry))
-      : fn,
-  });
+async function* limit(upstream, limit) {
+  let yielded = 0;
+  for await (const entry of upstream) {
+    yield entry;
+    yielded += 1;
+    if (yielded === limit) {
+      return;
+    }
+  }
 }
 
-function filter(context, fn) {
-  return createGenerator({
-    ...context,
-    filter: context.filter
-      ? (entry) => context.filter(entry) && fn(entry)
-      : fn,
-  });
+async function* map(upstream, fn) {
+  for await (let entry of upstream) {
+    entry = await fn(entry);
+    if (entry) yield entry;
+  }
 }
 
-function slice(context, from, to) {
-  return createGenerator({ ...context, skip: from, limit: to - from });
+function filter(upstream, fn) {
+  return map(upstream, (entry) => (fn(entry) ? entry : null));
 }
 
-function follow(context, name) {
-  return map(context, async (entry) => {
+function slice(upstream, from, to) {
+  return limit(skip(upstream, from), to - from);
+}
+
+function follow(upstream, name, context) {
+  const { fetch, parseHtml } = context;
+  return map(upstream, async (entry) => {
     const value = entry[name];
     if (value) {
-      const resp = await context.fetch(value);
+      const resp = await fetch(value);
       if (resp.ok) {
-        const html = await resp.text();
-        return context.parseHtml(html);
+        return { ...entry, [name]: parseHtml(await resp.text()) };
       }
     }
     return null;
   });
 }
 
-async function all(context) {
+async function all(upstream) {
   const result = [];
-  for await (const entry of request(context)) {
+  for await (const entry of upstream) {
     result.push(entry);
   }
   return result;
 }
 
-async function first(context) {
+async function first(upstream) {
   /* eslint-disable-next-line no-unreachable-loop */
-  for await (const entry of request(context)) {
+  for await (const entry of upstream) {
     return entry;
   }
   return null;
@@ -119,24 +100,27 @@ async function first(context) {
 
 // helper
 
-function createGenerator(context) {
-  // create the generator and assign additional operations 
-  return Object.assign(request(context), {
-    chunks: chunks.bind(null, context),
-    limit: limit.bind(null, context),
-    map: map.bind(null, context),
-    filter: filter.bind(null, context),
-    slice: slice.bind(null, context),
-    follow: follow.bind(null, context),
-    all: all.bind(null, context),
-    first: first.bind(null, context),
+function assignOperations(generator, context) {
+  function createOperation(fn) {
+    return (...rest) => assignOperations(fn.apply(null, [generator, ...rest, context]), context);
+  }
+  return Object.assign(generator, {
+    chunks: chunks.bind(null, generator, context),
+    skip: createOperation(skip),
+    limit: createOperation(limit),
+    slice: createOperation(slice),
+    map: createOperation(map),
+    filter: createOperation(filter),
+    follow: createOperation(follow),
+    all: all.bind(null, generator),
+    first: first.bind(null, generator),
   });
 }
 
 export default function ffetch(
-  url, 
-  fetch = window.fetch, 
-  parseHtml = (html) => new window.DOMParser().parseFromString(html, 'text/html')
+  url,
+  fetch = window.fetch,
+  parseHtml = (html) => new window.DOMParser().parseFromString(html, 'text/html'),
 ) {
   let chunks = 255;
 
@@ -147,7 +131,7 @@ export default function ffetch(
     }
   } catch (e) { /* ignore */ }
 
-  return createGenerator({
-    fetch, parseHtml, url, offset: 0, skip: 0, chunks, limit: Infinity,
-  });
+  const context = { chunks, fetch, parseHtml };
+
+  return assignOperations(request(url, context), context);
 }

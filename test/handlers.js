@@ -29,9 +29,9 @@ export default [
         offset,
         limit,
         data: [{
-          path: '/document'
-        }]
-      })
+          path: '/document',
+        }],
+      }),
     );
   }),
 
@@ -46,16 +46,14 @@ export default [
         offset,
         limit,
         data: [{
-          path: '/notfound'
-        }]
-      })
+          path: '/notfound',
+        }],
+      }),
     );
   }),
 
-  rest.get('https://test.data/document', (req, res, ctx) => {
-    return res(
-      ctx.status(200, 'OK'),
-      ctx.text('<!DOCTYPE html><html><head><title>Document</title></head><body><main><p>Hello World</p></main></body></html>')
-    );
-  })
+  rest.get('https://test.data/document', (req, res, ctx) => res(
+    ctx.status(200, 'OK'),
+    ctx.text('<!DOCTYPE html><html><head><title>Document</title></head><body><main><p>Hello World</p></main></body></html>'),
+  )),
 ];

@@ -1,5 +1,7 @@
 /* eslint-disable no-undef */
 import { fetch as adobeFetch } from '@adobe/fetch';
+import { promises as fs } from 'node:fs';
+import { URL } from 'node:url';
 import assert from 'node:assert/strict';
 import { parseDocument } from 'htmlparser2';
 import nock from 'nock';
@@ -16,9 +18,11 @@ function mockIndexRequests(path, total, chunks = 255, generatorFn = (i) => ({ ti
   for (let offset = 0; offset < total; offset += chunks) {
     const data = Array.from(
       { length: offset + chunks < total ? chunks : 555 - offset },
-      (_, i) => generatorFn(offset + i)
+      (_, i) => generatorFn(offset + i),
     );
-    const response = { total, offset, limit: chunks, data };
+    const response = {
+      total, offset, limit: chunks, data,
+    };
 
     nock(testDomain).get(path).query({ offset, limit: chunks }).reply(200, response);
   }
@@ -33,6 +37,13 @@ describe('ffetch', () => {
   const fetch = (url) => (url.charAt(0) === '/'
     ? adobeFetch(`${testDomain}${url}`)
     : adobeFetch(url));
+
+  it('has no dependencies', async () => {
+    const packageJson = await fs.readFile(new URL('../package.json', import.meta.url), { encoding: 'utf-8' });
+    const { dependencies } = JSON.parse(packageJson);
+
+    assert(!dependencies || dependencies.length === 0);
+  });
 
   it('returns a generator for all entries', async () => {
     mockIndexRequests('/query-index.json', 555);
@@ -237,7 +248,7 @@ describe('ffetch', () => {
       });
 
       it('returns null if the referenced document is not found', async () => {
-        mockNotFound('/document')
+        mockNotFound('/document');
         mockIndexRequests('/query-index.json', 1, 255, () => ({ path: '/document' }));
 
         const entry = await ffetch('/query-index.json', fetch, parseDocument)

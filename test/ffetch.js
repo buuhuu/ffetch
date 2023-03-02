@@ -167,16 +167,18 @@ describe('ffetch', () => {
 
     it('returns an array of a slice of entries', async () => {
       const entries = await ffetch('/555-simple-entries.json', fetch)
-        .slice(5, 10)
+        .slice(300, 305)
         .all();
 
       assert.deepStrictEqual(entries, [
-        { title: 'Entry 5' },
-        { title: 'Entry 6' },
-        { title: 'Entry 7' },
-        { title: 'Entry 8' },
-        { title: 'Entry 9' },
+        { title: 'Entry 300' },
+        { title: 'Entry 301' },
+        { title: 'Entry 302' },
+        { title: 'Entry 303' },
+        { title: 'Entry 304' },
       ]);
+
+      assert.equal(2, requestCount);
     });
 
   })

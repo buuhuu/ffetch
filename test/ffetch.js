@@ -59,7 +59,7 @@ describe('ffetch', () => {
   it('returns a generator for all entries', async () => {
     mockIndexRequests('/query-index.json', 555);
 
-    const entries = ffetch('/query-index.json', fetch);
+    const entries = ffetch('/query-index.json').withFetch(fetch);
     let i = 0;
     for await (const entry of entries) {
       assert.deepStrictEqual(entry, { title: `Entry ${i}` });
@@ -73,7 +73,7 @@ describe('ffetch', () => {
     it('returns an empty generator for a 404', async () => {
       mockNotFound('/not-found.json');
 
-      const entries = ffetch('/not-found.json', fetch);
+      const entries = ffetch('/not-found.json').withFetch(fetch);
 
       /* eslint-disable-next-line no-unused-vars */
       for await (const entry of entries) assert(false);
@@ -82,7 +82,7 @@ describe('ffetch', () => {
     it('returns an empty array for a 404', async () => {
       mockNotFound('/not-found.json');
 
-      const entries = await ffetch('/not-found.json', fetch).all();
+      const entries = await ffetch('/not-found.json').withFetch(fetch).all();
 
       assert.equal(entries.length, 0);
     });
@@ -90,7 +90,7 @@ describe('ffetch', () => {
     it('returns null for the first enrty of a 404', async () => {
       mockNotFound('/not-found.json');
 
-      const entry = await ffetch('/not-found.json', fetch).first();
+      const entry = await ffetch('/not-found.json').withFetch(fetch).first();
 
       assert.equal(null, entry);
     });
@@ -101,7 +101,7 @@ describe('ffetch', () => {
       it('returns a generator for all entries with custom chunk size', async () => {
         mockIndexRequests('/query-index.json', 555, 1000);
 
-        const entries = ffetch('/query-index.json', fetch).chunks(1000);
+        const entries = ffetch('/query-index.json').withFetch(fetch).chunks(1000);
         let i = 0;
         for await (const entry of entries) {
           assert.deepStrictEqual(entry, { title: `Entry ${i}` });
@@ -116,7 +116,7 @@ describe('ffetch', () => {
       it('returns a generator that maps each entry', async () => {
         mockIndexRequests('/query-index.json', 555);
 
-        const entries = ffetch('/query-index.json', fetch)
+        const entries = ffetch('/query-index.json').withFetch(fetch)
           .map(({ title }) => title);
         let i = 0;
         for await (const entry of entries) {
@@ -130,7 +130,7 @@ describe('ffetch', () => {
       it('returns the first enrty after applying multiple mappings', async () => {
         mockIndexRequests('/query-index.json', 555);
 
-        const entry = await ffetch('/query-index.json', fetch)
+        const entry = await ffetch('/query-index.json').withFetch(fetch)
           .map(({ title }) => title)
           .map((title) => title.toUpperCase())
           .first();
@@ -144,7 +144,7 @@ describe('ffetch', () => {
         mockIndexRequests('/query-index.json', 555);
 
         const expectedEntries = ['Entry 99', 'Entry 199', 'Entry 299', 'Entry 399', 'Entry 499'];
-        const entries = ffetch('/query-index.json', fetch)
+        const entries = ffetch('/query-index.json').withFetch(fetch)
           .filter(({ title }) => expectedEntries.indexOf(title) >= 0);
         let i = 0;
         for await (const entry of entries) {
@@ -158,7 +158,7 @@ describe('ffetch', () => {
       it('returns the first enrty after multiple filters', async () => {
         mockIndexRequests('/query-index.json', 555);
 
-        const entry = await ffetch('/query-index.json', fetch)
+        const entry = await ffetch('/query-index.json').withFetch(fetch)
           .filter(({ title }) => title.indexOf('9') > 0)
           .filter(({ title }) => title.indexOf('8') > 0)
           .filter(({ title }) => title.indexOf('4') > 0)
@@ -172,7 +172,7 @@ describe('ffetch', () => {
       it('returns a generator for a limited set entries', async () => {
         mockIndexRequests('/query-index.json', 555);
 
-        const entries = ffetch('/query-index.json', fetch)
+        const entries = ffetch('/query-index.json').withFetch(fetch)
           .limit(10);
         let i = 0;
         for await (const entry of entries) {
@@ -186,7 +186,7 @@ describe('ffetch', () => {
       it('returns an array of all entries', async () => {
         mockIndexRequests('/query-index.json', 555);
 
-        const entries = await ffetch('/query-index.json', fetch)
+        const entries = await ffetch('/query-index.json').withFetch(fetch)
           .limit(5)
           .all();
 
@@ -205,7 +205,7 @@ describe('ffetch', () => {
         mockIndexRequests('/query-index.json', 555);
 
         const expectedEntries = ['Entry 99', 'Entry 199', 'Entry 299', 'Entry 399', 'Entry 499'];
-        const entries = ffetch('/query-index.json', fetch)
+        const entries = ffetch('/query-index.json').withFetch(fetch)
           .filter(({ title }) => expectedEntries.indexOf(title) >= 0)
           .slice(2, 4);
         let i = 0;
@@ -220,7 +220,7 @@ describe('ffetch', () => {
       it('returns an array of a slice of entries', async () => {
         mockIndexRequests('/query-index.json', 555);
 
-        const entries = await ffetch('/query-index.json', fetch)
+        const entries = await ffetch('/query-index.json').withFetch(fetch)
           .slice(300, 305)
           .all();
 
@@ -239,7 +239,7 @@ describe('ffetch', () => {
         mockDocumentRequest('/document');
         mockIndexRequests('/query-index.json', 1, 255, () => ({ path: '/document' }));
 
-        const entry = await ffetch('/query-index.json', fetch, parseDocument)
+        const entry = await ffetch('/query-index.json').withFetch(fetch).withHtmlParser(parseDocument)
           .follow('path')
           .first();
 
@@ -250,7 +250,7 @@ describe('ffetch', () => {
       it('returns null if the reference does not exist', async () => {
         mockIndexRequests('/query-index.json', 1, 255, () => ({ ref: '/document' }));
 
-        const entry = await ffetch('/query-index.json', fetch, parseDocument)
+        const entry = await ffetch('/query-index.json').withFetch(fetch).withHtmlParser(parseDocument)
           .follow('path')
           .first();
 
@@ -262,7 +262,7 @@ describe('ffetch', () => {
         mockNotFound('/document');
         mockIndexRequests('/query-index.json', 1, 255, () => ({ path: '/document' }));
 
-        const entry = await ffetch('/query-index.json', fetch, parseDocument)
+        const entry = await ffetch('/query-index.json').withFetch(fetch).withHtmlParser(parseDocument)
           .follow('path')
           .first();
 
@@ -275,7 +275,7 @@ describe('ffetch', () => {
   it('implements array-like semantics for chaining operations', async () => {
     mockIndexRequests('/query-index.json', 555);
 
-    const entries = await ffetch('/query-index.json', fetch)
+    const entries = await ffetch('/query-index.json').withFetch(fetch)
       .slice(100, 500) // entry 199 to 499
       .map(({ title }) => title) // map to title
       .filter((title) => title.indexOf('99') > 0) // filter now applied on title

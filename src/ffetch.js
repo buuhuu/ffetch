@@ -24,14 +24,24 @@ async function* request(url, context) {
   }
 }
 
-// Operations
+// Operations:
+
+function withFetch(upstream, context, fetch) {
+  context.fetch = fetch;
+  return upstream;
+}
+
+function withHtmlParser(upstream, context, parseHtml) {
+  context.parseHtml = parseHtml;
+  return upstream;
+}
 
 function chunks(upstream, context, chunks) {
   context.chunks = chunks;
   return upstream;
 }
 
-async function* skip(upstream, skip) {
+async function* skip(upstream, context, skip) {
   let skipped = 0;
   for await (const entry of upstream) {
     if (skipped < skip) {
@@ -42,7 +52,7 @@ async function* skip(upstream, skip) {
   }
 }
 
-async function* limit(upstream, limit) {
+async function* limit(upstream, context, limit) {
   let yielded = 0;
   for await (const entry of upstream) {
     yield entry;
@@ -53,31 +63,46 @@ async function* limit(upstream, limit) {
   }
 }
 
-async function* map(upstream, fn) {
+async function* map(upstream, context, fn, maxInFlight = 5) {
+  const promises = [];
   for await (let entry of upstream) {
-    entry = await fn(entry);
+    promises.push(fn(entry));
+    if (promises.length === maxInFlight) {
+      for (entry of promises) {
+        entry = await entry;
+        if (entry) yield entry;
+      }
+      promises.splice(0, promises.length);
+    }
+  }
+  for (let entry of promises) {
+    entry = await entry;
     if (entry) yield entry;
   }
 }
 
-function filter(upstream, fn) {
-  return map(upstream, (entry) => (fn(entry) ? entry : null));
+async function* filter(upstream, context, fn) {
+  for await (let entry of upstream) {
+    if (fn(entry)) {
+      yield entry;
+    }
+  }
 }
 
-function slice(upstream, from, to) {
-  return limit(skip(upstream, from), to - from);
+function slice(upstream, context, from, to) {
+  return limit(skip(upstream, context, from), context, to - from);
 }
 
-function follow(upstream, name, context) {
+function follow(upstream, context, name, maxInFlight = 5) {
   const { fetch, parseHtml } = context;
-  return map(upstream, async (entry) => {
+  return map(upstream, context, async (entry) => {
     const value = entry[name];
     if (value) {
       const resp = await fetch(value);
       return { ...entry, [name]: resp.ok ? parseHtml(await resp.text()) : null };
     }
     return entry;
-  });
+  }, maxInFlight);
 }
 
 async function all(upstream) {
@@ -96,31 +121,38 @@ async function first(upstream) {
   return null;
 }
 
-// helper
+// Helper
 
 function assignOperations(generator, context) {
+  // operations that return a new generator
   function createOperation(fn) {
-    return (...rest) => assignOperations(fn.apply(null, [generator, ...rest, context]), context);
+    return (...rest) => assignOperations(fn.apply(null, [generator, context, ...rest]), context);
   }
-  return Object.assign(generator, {
-    chunks: chunks.bind(null, generator, context),
+  let operations = {
     skip: createOperation(skip),
     limit: createOperation(limit),
     slice: createOperation(slice),
     map: createOperation(map),
     filter: createOperation(filter),
     follow: createOperation(follow),
-    all: all.bind(null, generator),
-    first: first.bind(null, generator),
-  });
+  }
+  
+  // functions that either return the upstream generator or no generator at all 
+  let functions = {
+    chunks: chunks.bind(null, generator, context),
+    all: all.bind(null, generator, context),
+    first: first.bind(null, generator, context),
+    withFetch: withFetch.bind(null, generator, context),
+    withHtmlParser: withHtmlParser.bind(null, generator, context),
+  }
+
+  return Object.assign(generator, operations, functions);
 }
 
-export default function ffetch(
-  url,
-  fetch = window.fetch,
-  parseHtml = (html) => new window.DOMParser().parseFromString(html, 'text/html'),
-) {
+export default function ffetch(url) {
   let chunks = 255;
+  let fetch = (...rest) => window.fetch.apply(null, rest);
+  let parseHtml = (html) => new window.DOMParser().parseFromString(html, 'text/html');
 
   try {
     if ('connection' in window.navigator && window.navigator.connection.saveData === true) {
@@ -130,6 +162,7 @@ export default function ffetch(
   } catch (e) { /* ignore */ }
 
   const context = { chunks, fetch, parseHtml };
+  const generator = request(url, context);
 
-  return assignOperations(request(url, context), context);
+  return assignOperations(generator, context);
 }

@@ -82,7 +82,7 @@ async function* map(upstream, context, fn, maxInFlight = 5) {
 }
 
 async function* filter(upstream, context, fn) {
-  for await (let entry of upstream) {
+  for await (const entry of upstream) {
     if (fn(entry)) {
       yield entry;
     }
@@ -128,31 +128,31 @@ function assignOperations(generator, context) {
   function createOperation(fn) {
     return (...rest) => assignOperations(fn.apply(null, [generator, context, ...rest]), context);
   }
-  let operations = {
+  const operations = {
     skip: createOperation(skip),
     limit: createOperation(limit),
     slice: createOperation(slice),
     map: createOperation(map),
     filter: createOperation(filter),
     follow: createOperation(follow),
-  }
-  
-  // functions that either return the upstream generator or no generator at all 
-  let functions = {
+  };
+
+  // functions that either return the upstream generator or no generator at all
+  const functions = {
     chunks: chunks.bind(null, generator, context),
     all: all.bind(null, generator, context),
     first: first.bind(null, generator, context),
     withFetch: withFetch.bind(null, generator, context),
     withHtmlParser: withHtmlParser.bind(null, generator, context),
-  }
+  };
 
   return Object.assign(generator, operations, functions);
 }
 
 export default function ffetch(url) {
   let chunks = 255;
-  let fetch = (...rest) => window.fetch.apply(null, rest);
-  let parseHtml = (html) => new window.DOMParser().parseFromString(html, 'text/html');
+  const fetch = (...rest) => window.fetch.apply(null, rest);
+  const parseHtml = (html) => new window.DOMParser().parseFromString(html, 'text/html');
 
   try {
     if ('connection' in window.navigator && window.navigator.connection.saveData === true) {

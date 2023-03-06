@@ -239,7 +239,7 @@ describe('ffetch', () => {
     });
 
     describe('sheet', () => {
-      it('returns a generator for a entries of a given sheet', async () => {
+      it('returns a generator for all entries of a given sheet', async () => {
         mockIndexRequests('/query-index.json', 555, 255, 'test');
     
         const entries = ffetch('/query-index.json').withFetch(fetch).sheet('test');

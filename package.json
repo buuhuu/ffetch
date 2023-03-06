@@ -5,7 +5,8 @@
   "main": "src/index.js",
   "type": "module",
   "scripts": {
-    "test": "c8 mocha"
+    "test": "c8 mocha",
+    "lint": "eslint src/**/*.js test/**/*.js"
   },
   "keywords": [
     "fetch",
@@ -14,7 +15,13 @@
   "author": "Dirk Rudolph",
   "license": "Apache-2.0",
   "devDependencies": {
+    "@adobe/eslint-config-helix": "^2.0.2",
+    "@adobe/fetch": "^4.0.4",
     "c8": "^7.13.0",
-    "mocha": "^10.2.0"
+    "eslint": "^8.35.0",
+    "eslint-plugin-import": "^2.27.5",
+    "htmlparser2": "^8.0.1",
+    "mocha": "^10.2.0",
+    "nock": "^13.3.0"
   }
 }

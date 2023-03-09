@@ -11,9 +11,11 @@
  */
 
 async function* request(url, context) {
-  const { chunks, fetch } = context;
+  const { chunks, sheet, fetch } = context;
   for (let offset = 0, total = Infinity; offset < total; offset += chunks) {
-    const resp = await fetch(`${url}?offset=${offset}&limit=${chunks}`);
+    const params = new URLSearchParams(`offset=${offset}&limit=${chunks}`);
+    if (sheet) params.append(`sheet`, sheet);
+    const resp = await fetch(`${url}?${params.toString()}`);
     if (resp.ok) {
       const json = await resp.json();
       total = json.total;
@@ -38,6 +40,11 @@ function withHtmlParser(upstream, context, parseHtml) {
 
 function chunks(upstream, context, chunks) {
   context.chunks = chunks;
+  return upstream;
+}
+
+function sheet(upstream, context, sheet) {
+  context.sheet = sheet;
   return upstream;
 }
 
@@ -144,6 +151,7 @@ function assignOperations(generator, context) {
     first: first.bind(null, generator, context),
     withFetch: withFetch.bind(null, generator, context),
     withHtmlParser: withHtmlParser.bind(null, generator, context),
+    sheet: sheet.bind(null, generator, context),
   };
 
   return Object.assign(generator, operations, functions);

@@ -25,7 +25,7 @@ function mockDocumentRequest(path, body = '<!DOCTYPE html><html><head><title>Doc
   nock(testDomain).get(path).reply(200, body);
 }
 
-function mockIndexRequests(path, total, chunks = 255, generatorFn = (i) => ({ title: `Entry ${i}` })) {
+function mockIndexRequests(path, total, chunks = 255, sheet, generatorFn = (i) => ({ title: `Entry ${i}` })) {
   for (let offset = 0; offset < total; offset += chunks) {
     const data = Array.from(
       { length: offset + chunks < total ? chunks : 555 - offset },
@@ -34,8 +34,12 @@ function mockIndexRequests(path, total, chunks = 255, generatorFn = (i) => ({ ti
     const response = {
       total, offset, limit: chunks, data,
     };
+    const params = { offset, limit: chunks };
+    if (sheet) {
+      params.sheet = sheet;
+    }
 
-    nock(testDomain).get(path).query({ offset, limit: chunks }).reply(200, response);
+    nock(testDomain).get(path).query(params).reply(200, response);
   }
 }
 
@@ -234,10 +238,25 @@ describe('ffetch', () => {
       });
     });
 
+    describe('sheet', () => {
+      it('returns a generator for all entries of a given sheet', async () => {
+        mockIndexRequests('/query-index.json', 555, 255, 'test');
+    
+        const entries = ffetch('/query-index.json').withFetch(fetch).sheet('test');
+        let i = 0;
+        for await (const entry of entries) {
+          assert.deepStrictEqual(entry, { title: `Entry ${i}` });
+          i += 1;
+        }
+    
+        assert.equal(555, i);
+      });
+    });
+
     describe('follow', () => {
       it('returns the html parsed as document when following a reference', async () => {
         mockDocumentRequest('/document');
-        mockIndexRequests('/query-index.json', 1, 255, () => ({ path: '/document' }));
+        mockIndexRequests('/query-index.json', 1, 255, null, () => ({ path: '/document' }));
 
         const entry = await ffetch('/query-index.json').withFetch(fetch).withHtmlParser(parseDocument)
           .follow('path')
@@ -248,7 +267,7 @@ describe('ffetch', () => {
       });
 
       it('returns null if the reference does not exist', async () => {
-        mockIndexRequests('/query-index.json', 1, 255, () => ({ ref: '/document' }));
+        mockIndexRequests('/query-index.json', 1, 255, null, () => ({ ref: '/document' }));
 
         const entry = await ffetch('/query-index.json').withFetch(fetch).withHtmlParser(parseDocument)
           .follow('path')
@@ -260,7 +279,7 @@ describe('ffetch', () => {
 
       it('returns null if the referenced document is not found', async () => {
         mockNotFound('/document');
-        mockIndexRequests('/query-index.json', 1, 255, () => ({ path: '/document' }));
+        mockIndexRequests('/query-index.json', 1, 255, null, () => ({ path: '/document' }));
 
         const entry = await ffetch('/query-index.json').withFetch(fetch).withHtmlParser(parseDocument)
           .follow('path')

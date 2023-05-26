@@ -275,6 +275,7 @@ describe('ffetch', () => {
           .first();
 
         assert(entry);
+        assert(entry.path === '/document');
         assert(entry.content);
       });
 

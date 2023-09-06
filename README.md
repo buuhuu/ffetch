@@ -59,9 +59,9 @@ for await (title of someentries) {
 }
 ```
 
-### Tune performance with `.chunk` and `.limit`
+### Tune performance with `.chunks` and `.limit`
 
-If you want to control the size of the chunks that are loaded using pagination, use `ffetch(...).chunk(100)`.
+If you want to control the size of the chunks that are loaded using pagination, use `ffetch(...).chunks(100)`.
 
 To limit the result set based on the number of entries you need to show on the page, use `ffetch(...).limit(5)`. The `limit()`
 applies after all `.filter()`s, so it is an effective way to only process what needs to be shown.

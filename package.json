@@ -17,6 +17,7 @@
   "devDependencies": {
     "@adobe/eslint-config-helix": "^2.0.2",
     "@adobe/fetch": "^4.0.4",
+    "@babel/eslint-parser": "^7.22.15",
     "c8": "^7.13.0",
     "eslint": "^8.35.0",
     "eslint-plugin-import": "^2.27.5",

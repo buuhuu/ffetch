@@ -25,7 +25,7 @@ function mockDocumentRequest(path, body = '<!DOCTYPE html><html><head><title>Doc
   nock(testDomain).get(path).reply(200, body);
 }
 
-function mockIndexRequests(path, total, chunks = 255, sheet, generatorFn = (i) => ({ title: `Entry ${i}` })) {
+function mockIndexRequests(path, total, chunks, sheet, generatorFn = (i) => ({ title: `Entry ${i}` })) {
   for (let offset = 0; offset < total; offset += chunks) {
     const data = Array.from(
       { length: offset + chunks < total ? chunks : 555 - offset },
@@ -241,14 +241,14 @@ describe('ffetch', () => {
     describe('sheet', () => {
       it('returns a generator for all entries of a given sheet', async () => {
         mockIndexRequests('/query-index.json', 555, 255, 'test');
-    
+
         const entries = ffetch('/query-index.json').withFetch(fetch).sheet('test');
         let i = 0;
         for await (const entry of entries) {
           assert.deepStrictEqual(entry, { title: `Entry ${i}` });
           i += 1;
         }
-    
+
         assert.equal(555, i);
       });
     });

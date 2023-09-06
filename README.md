@@ -52,7 +52,7 @@ But if you prefer to use `.map` and `.filter`, you can do this right on the gene
 
 ```javascript
 const someentries = ffetch('/query-index.json')
-  .map({title} => title)
+  .map(({title}) => title)
   .filter(title => title.indexOf('Franklin'));
 for await (title of someentries) {
   console.log(title);
@@ -89,8 +89,10 @@ each HTML document referenced from an index sheet.
 
 ```javascript
 const docs = ffetch('/query-index.json')
-  .follow('path') // assumes that the path property holds the reference to our document
-  .map(d => d.querySelector('img')) // get the first image
+   // assumes that the path property holds the reference to our document
+   // stores the returned document in a new field (optional)
+  .follow('path', 'document')
+  .map(({document}) => document.querySelector('img')) // get the first image
   .filter(i => !!i) // drop entries that don't have an image
   .limit(10); // that's enough
   

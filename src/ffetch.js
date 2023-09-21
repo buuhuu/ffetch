@@ -158,7 +158,9 @@ function assignOperations(generator, context) {
     getTotal: () => context.total,
   };
 
-  return Object.assign(generator, operations, functions);
+  Object.assign(generator, operations, functions);
+  Object.defineProperty(generator, 'total', { get: () => context.total });
+  return generator;
 }
 
 export default function ffetch(url) {

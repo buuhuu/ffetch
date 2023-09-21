@@ -65,11 +65,14 @@ describe('ffetch', () => {
 
     const entries = ffetch('/query-index.json').withFetch(fetch);
     let i = 0;
+
+    assert.equal(undefined, entries.total);
     for await (const entry of entries) {
       assert.deepStrictEqual(entry, { title: `Entry ${i}` });
       i += 1;
     }
 
+    assert.equal(555, entries.total);
     assert.equal(555, i);
   });
 

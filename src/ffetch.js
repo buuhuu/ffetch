@@ -21,6 +21,7 @@ async function* request(url, context) {
     if (resp.ok) {
       const json = await resp.json();
       total = json.total;
+      context.total = total;
       for (const entry of json.data) yield entry;
     } else {
       return;
@@ -156,7 +157,9 @@ function assignOperations(generator, context) {
     sheet: sheet.bind(null, generator, context),
   };
 
-  return Object.assign(generator, operations, functions);
+  Object.assign(generator, operations, functions);
+  Object.defineProperty(generator, 'total', { get: () => context.total });
+  return generator;
 }
 
 export default function ffetch(url) {

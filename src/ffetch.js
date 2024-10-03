@@ -13,11 +13,11 @@
 /* eslint-disable no-restricted-syntax,  no-await-in-loop */
 
 async function* request(url, context) {
-  const { chunkSize, sheetName, fetch } = context;
+  const { chunkSize, cacheReload, sheetName, fetch } = context;
   for (let offset = 0, total = Infinity; offset < total; offset += chunkSize) {
     const params = new URLSearchParams(`offset=${offset}&limit=${chunkSize}`);
     if (sheetName) params.append('sheet', sheetName);
-    const resp = await fetch(`${url}?${params.toString()}`);
+    const resp = await fetch(`${url}?${params.toString()}`, { cache: cacheReload ? 'reload' : 'default' });
     if (resp.ok) {
       const json = await resp.json();
       total = json.total;
@@ -164,6 +164,7 @@ function assignOperations(generator, context) {
 
 export default function ffetch(url) {
   let chunkSize = 255;
+  let cacheReload = false;
   const fetch = (...rest) => window.fetch.apply(null, rest);
   const parseHtml = (html) => new window.DOMParser().parseFromString(html, 'text/html');
 
@@ -172,9 +173,13 @@ export default function ffetch(url) {
       // request smaller chunks in save data mode
       chunkSize = 64;
     }
+    // detect page reloads and set cacheReload to true
+    const entries = performance.getEntriesByType("navigation");
+    const reloads = entries.filter((entry) => entry.type === "reload");
+    if (reloads.length > 0) cacheReload = true;
   } catch (e) { /* ignore */ }
 
-  const context = { chunkSize, fetch, parseHtml };
+  const context = { chunkSize, cacheReload, fetch, parseHtml };
   const generator = request(url, context);
 
   return assignOperations(generator, context);

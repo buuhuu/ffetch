@@ -76,7 +76,7 @@ describe('ffetch', () => {
     assert.equal(555, i);
   });
 
-  describe('failure hanlding', () => {
+  describe('failure handling', () => {
     it('returns an empty generator for a 404', async () => {
       mockNotFound('/not-found.json');
 
